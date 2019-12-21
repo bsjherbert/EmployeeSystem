@@ -53,8 +53,67 @@ const addRole = () => {
 };
 
 const addEmployee = () => {
-    console.log("Adding Employee...");
-}
+    connection.query("SELECT * FROM role", (err, roles) => {
+        if (err) throw err;
+        connection.query("SELECT * FROM employee", (err, employees) => {
+            if (err) throw err;
+
+            inquirer.prompt([
+                {
+                    type: "input",
+                    name: "firstName",
+                    message: "First Name?"
+                },
+                {
+                    type: "input",
+                    name: "lastName",
+                    message: "Last Name?"
+                },
+                {
+                    type: "list",
+                    name: "roleId",
+                    message: "Role?",
+                    choices: function () {
+                        return roles.map(role => {
+                            return { name: role.title, value: role.id, short: role.title };
+                        });
+                    }
+                },
+                {
+                    type: "list",
+                    name: "managerId",
+                    message: "Manager?",
+                    choices: function () {
+                        return employees.map(employee => {
+                            return { name: `${employee.first_name} ${employee.last_name}`, value: employee.id, short: employee.last_name };
+                        })
+                    }
+                }
+            ]).then(answers => {
+                connection.query("INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)",
+                [answers.firstName, answers.lastName, answers.roleId, answers.managerId],
+                (err, results) => {
+                    if (err) throw err;
+                    mainMenu();
+                }
+                );
+            });
+        });
+    });
+};
+
+const viewEmployees = () => {
+    connection.query(`SELECT e.first_name, e.last_name, r.title AS role_title, CONCAT(mgr.first_name, mgr.last_name) AS managers_name
+    FROM employee AS e
+    LEFT JOIN role AS r ON e.role_id = r.id
+    LEFT JOIN employee AS mgr ON e.manager_id = mgr.id
+    LEFT JOIN department AS d ON r.department_id = d.id`,
+    (err, results) => {
+        console.table(results);
+        mainMenu();
+    });
+
+};
 
 const mainMenu = () => {
     inquirer.prompt([
@@ -65,7 +124,9 @@ const mainMenu = () => {
             choices: [
                 "Add a Department",
                 "Add a Role",
-                "Add an Employee"
+                "Add an Employee",
+                "View Employees",
+                "Exit" 
             ]
         }
     ]).then(userAnswers => {
@@ -79,6 +140,12 @@ const mainMenu = () => {
             case "Add an Employee":
                 addEmployee();
                 break;
+            case "View Employees":
+                viewEmployees();
+                break;
+            default:
+                console.log("Exiting...");
+                connection.end();
         }
     });
 }
